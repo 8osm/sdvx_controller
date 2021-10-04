@@ -1,19 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:socket_io_client/socket_io_client.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sdvx_controller/socket_bloc.dart';
 
 void main() {
-  Socket socket = io('http://10.1.0.188:3000',
-      OptionBuilder().setTransports(['websocket']).build());
-  socket.onConnectError((data) => print(data));
-  socket.onConnect((_) {
-    print('connect');
-    socket.emit('msg', 'test');
-  });
-  socket.on('event', (data) => print(data));
-  socket.on('msg', (data) => {print(data)});
-  socket.onDisconnect((_) => print('disconnect'));
-  socket.on('fromServer', (_) => print(_));
   runApp(const SDVXController());
 }
 
@@ -30,7 +20,8 @@ class SDVXController extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(),
+      home: BlocProvider<SocketBloc>(
+          create: (_) => SocketBloc(), child: const MyHomePage()),
     );
   }
 }
@@ -41,17 +32,42 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Center(
-      child: Container(
-        margin: const EdgeInsets.all(10.0),
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 250),
-        child: Column(
-          children: [
-            TextField(),
-            ElevatedButton(onPressed: () => {}, child: Text("aaa"))
-          ],
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 250),
+          child: BlocBuilder<SocketBloc, SocketState>(
+            builder: (_, state) {
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const TextField(),
+                  ElevatedButton(
+                      onPressed: () {
+                        if (!state.initialized) {
+                          context
+                              .read<SocketBloc>()
+                              .add(SocketInitEvent('http://10.1.0.188:3000'));
+                          context.read<SocketBloc>().add(SocketConnectEvent());
+                        } else {
+                          if (!state.connected) {
+                            context
+                                .read<SocketBloc>()
+                                .add(SocketConnectEvent());
+                          } else {
+                            context
+                                .read<SocketBloc>()
+                                .add(SocketDisconnectEvent());
+                          }
+                        }
+                      },
+                      child: Text("aaa")),
+                  Text(state.connected ? "connected" : "disconnected")
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
   }
 }
